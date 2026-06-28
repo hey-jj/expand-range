@@ -64,6 +64,18 @@ pub fn run_checked(
     fill_checked(start, end, step, opts)
 }
 
+/// Build a regex from a numeric range and test a candidate against it.
+///
+/// Mirrors `new RegExp('^(' + fill(...) + ')$').test(input)`.
+pub fn is_match(start: Value, end: Value, opts: Options, input: &str) -> bool {
+    let source = match fill(start, Some(end), Step::None, opts) {
+        FillResult::Regex(r) => r,
+        FillResult::List(_) => panic!("expected a regex result"),
+    };
+    let re = regex::Regex::new(&format!("^({source})$")).expect("valid regex");
+    re.is_match(input)
+}
+
 /// Naive inclusive numeric enumerator, used by the match-verification oracle.
 pub fn expand(start: i64, stop: i64) -> Vec<i64> {
     let mut out = vec![];

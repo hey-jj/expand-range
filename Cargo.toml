@@ -8,3 +8,9 @@ repository = "https://github.com/hey-jj/expand-range"
 readme = "README.md"
 
 [dependencies]
+
+# The library itself uses only std. The regex crate is test-only: the
+# match-verification suite compiles each generated pattern and checks that it
+# accepts exactly the integers in range.
+[dev-dependencies]
+regex = "1"
