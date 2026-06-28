@@ -313,7 +313,11 @@ fn fill_numbers(
             capture: opts.capture,
             wrap: opts.wrap,
         };
-        return Ok(FillResult::Regex(to_regex_range(&lo, &hi, &ro)));
+        // A bound wider than i64 cannot be compiled, so treat it as invalid.
+        return match to_regex_range(&lo, &hi, &ro) {
+            Some(source) => Ok(FillResult::Regex(source)),
+            None => invalid_range(start, end, opts.strict_ranges),
+        };
     }
 
     let mut parts = Parts {
@@ -356,17 +360,9 @@ fn fill_numbers(
     }
 
     if opts.to_regex {
-        if step > 1 {
-            return Ok(FillResult::Regex(to_sequence(parts, opts, max_len)));
-        }
-        // step == 1 with to_regex is handled by the fast path above. This arm
-        // exists for completeness and mirrors the source.
-        let members: Vec<String> = range.iter().map(|i| i.to_string()).collect();
-        return Ok(FillResult::Regex(to_regex_array(
-            &members,
-            opts.wrap,
-            opts.capture,
-        )));
+        // step is always greater than one here. The step-one regex path returned
+        // from the fast path above, and step is clamped to at least one.
+        return Ok(FillResult::Regex(to_sequence(parts, opts, max_len)));
     }
 
     Ok(FillResult::List(range))

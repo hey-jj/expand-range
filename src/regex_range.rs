@@ -35,44 +35,40 @@ struct Token {
     string: String,
 }
 
-/// True when a numeric string has a meaningful leading zero, like `"05"`.
+/// True when a numeric string has a leading zero followed by a digit.
+///
+/// Matches `/^-?(0+)\d/`: an optional sign, one or more zeros, then any digit.
+/// `"05"`, `"00"`, and `"-00"` are padded. `"0"` and `"5"` are not. A lone zero
+/// fails because it has no digit after the zero run.
 fn has_padding(s: &str) -> bool {
     let body = s.strip_prefix('-').unwrap_or(s);
     let mut chars = body.chars();
-    match chars.next() {
-        Some('0') => {}
-        _ => return false,
+    if chars.next() != Some('0') {
+        return false;
     }
-    // Need at least one more zero or digit after the first zero.
-    let mut saw_zero = true;
-    for c in chars {
-        if !c.is_ascii_digit() {
-            return false;
-        }
-        if saw_zero && c != '0' {
-            return true;
-        }
-        if c != '0' {
-            return true;
-        }
-        saw_zero = true;
-    }
-    // Matches /^-?(0+)\d/: zeros then a digit. A run of only zeros fails.
-    false
+    // The regex is not anchored at the end. A leading zero plus one more digit
+    // is enough. Anything after that digit does not matter.
+    matches!(chars.next(), Some(c) if c.is_ascii_digit())
 }
 
 /// The largest value with `len` trailing nines that shares a prefix with `min`.
+///
+/// Saturates to `i64::MAX` when the constructed number overflows, which keeps the
+/// `split_to_ranges` loop bounded instead of panicking on wide inputs.
 fn count_nines(min: i64, len: usize) -> i64 {
     let s = min.to_string();
     let keep = s.len().saturating_sub(len);
     let prefix = &s[..keep];
     let nines: String = std::iter::repeat_n('9', len).collect();
-    format!("{prefix}{nines}").parse().unwrap()
+    format!("{prefix}{nines}").parse().unwrap_or(i64::MAX)
 }
 
 /// Round `integer` down to a multiple of `10^zeros`.
+///
+/// Saturates the power of ten so a large `zeros` cannot overflow.
 fn count_zeros(integer: i64, zeros: u32) -> i64 {
-    integer - integer.rem_euclid(10_i64.pow(zeros))
+    let modulus = 10_i64.checked_pow(zeros).unwrap_or(i64::MAX);
+    integer - integer.rem_euclid(modulus)
 }
 
 /// Build the quantifier text for a count pair.
@@ -128,9 +124,13 @@ fn pad_zeros(value: i64, st: &State, relax: bool) -> String {
 /// Split `[min, max]` at the boundaries where digit patterns change.
 fn split_to_ranges(min: i64, max: i64) -> Vec<i64> {
     let mut stops: Vec<i64> = vec![max];
+    // An i64 has at most 19 decimal digits. Past that width no new boundary
+    // appears, and the cap stops the loops from spinning when count_nines or
+    // count_zeros saturates at the i64 limit.
+    let max_width = 19usize;
     let mut nines = 1usize;
     let mut stop = count_nines(min, nines);
-    while min <= stop && stop <= max {
+    while nines <= max_width && min <= stop && stop <= max {
         if !stops.contains(&stop) {
             stops.push(stop);
         }
@@ -138,13 +138,14 @@ fn split_to_ranges(min: i64, max: i64) -> Vec<i64> {
         stop = count_nines(min, nines);
     }
     let mut zeros = 1u32;
-    let mut stop = count_zeros(max + 1, zeros) - 1;
-    while min < stop && stop <= max {
+    let ceiling = max.saturating_add(1);
+    let mut stop = count_zeros(ceiling, zeros) - 1;
+    while (zeros as usize) <= max_width && min < stop && stop <= max {
         if !stops.contains(&stop) {
             stops.push(stop);
         }
         zeros += 1;
-        stop = count_zeros(max + 1, zeros) - 1;
+        stop = count_zeros(ceiling, zeros) - 1;
     }
     stops.sort_unstable();
     stops
@@ -200,7 +201,7 @@ fn split_to_patterns(min: i64, max: i64, st: &State, relax: bool, shorthand: boo
                     }
                     prev.count.push(obj.count[0]);
                     prev.string = format!("{}{}", prev.pattern, to_quantifier(&prev.count));
-                    start = max + 1;
+                    start = max.saturating_add(1);
                     continue;
                 }
             }
@@ -216,7 +217,7 @@ fn split_to_patterns(min: i64, max: i64, st: &State, relax: bool, shorthand: boo
             count: obj.count,
             string,
         });
-        start = max + 1;
+        start = max.saturating_add(1);
     }
     tokens
 }
@@ -258,26 +259,30 @@ fn collate_patterns(neg: &[Token], pos: &[Token]) -> String {
 ///
 /// `min` and `max` are textual so leading zeros drive padding. The interval is
 /// inclusive. The result matches every integer in range and nothing else.
-pub(crate) fn to_regex_range(min: &str, max: &str, opts: &RegexOptions) -> String {
+///
+/// Returns `None` when a bound does not fit in `i64`. The caller routes that to
+/// the same empty-list or strict-error path it uses for other invalid input, so
+/// no input can make this panic.
+pub(crate) fn to_regex_range(min: &str, max: &str, opts: &RegexOptions) -> Option<String> {
     if min == max {
-        return min.to_string();
+        return Some(min.to_string());
     }
 
-    let min_n: i64 = min.parse().expect("numeric min");
-    let max_n: i64 = max.parse().expect("numeric max");
+    let min_n: i64 = min.parse().ok()?;
+    let max_n: i64 = max.parse().ok()?;
 
     let mut a = min_n.min(max_n);
     let b = min_n.max(max_n);
 
-    if (a - b).abs() == 1 {
+    if a.abs_diff(b) == 1 {
         let result = format!("{min}|{max}");
         if opts.capture {
-            return format!("({result})");
+            return Some(format!("({result})"));
         }
         if !opts.wrap {
-            return result;
+            return Some(result);
         }
-        return format!("(?:{result})");
+        return Some(format!("(?:{result})"));
     }
 
     let is_padded = has_padding(min) || has_padding(max);
@@ -291,8 +296,16 @@ pub(crate) fn to_regex_range(min: &str, max: &str, opts: &RegexOptions) -> Strin
     let mut negatives: Vec<Token> = vec![];
 
     if a < 0 {
-        let new_min = if b < 0 { b.abs() } else { 1 };
-        negatives = split_to_patterns(new_min, a.abs(), &st, opts.relax_zeros, opts.shorthand);
+        // `i64::MIN.abs()` has no positive counterpart, so use the unsigned
+        // magnitude and saturate. Bounds this large never match real input, and
+        // the split below stays correct for every representable value.
+        let new_min = if b < 0 {
+            b.unsigned_abs().min(i64::MAX as u64) as i64
+        } else {
+            1
+        };
+        let a_abs = a.unsigned_abs().min(i64::MAX as u64) as i64;
+        negatives = split_to_patterns(new_min, a_abs, &st, opts.relax_zeros, opts.shorthand);
         a = 0;
     }
 
@@ -307,5 +320,58 @@ pub(crate) fn to_regex_range(min: &str, max: &str, opts: &RegexOptions) -> Strin
     } else if opts.wrap && (positives.len() + negatives.len()) > 1 {
         result = format!("(?:{result})");
     }
-    result
+    Some(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_padding_matches_leading_zero_then_digit() {
+        // Truth table for /^-?(0+)\d/.
+        assert!(!has_padding("0"));
+        assert!(has_padding("00"));
+        assert!(has_padding("000"));
+        assert!(has_padding("01"));
+        assert!(has_padding("05"));
+        assert!(has_padding("-05"));
+        assert!(!has_padding("-0"));
+        assert!(has_padding("-00"));
+        assert!(!has_padding("0a"));
+        assert!(has_padding("00a"));
+        assert!(!has_padding("10"));
+        assert!(has_padding("020"));
+        assert!(!has_padding("5"));
+    }
+
+    #[test]
+    fn wide_bounds_return_none_instead_of_panicking() {
+        let opts = RegexOptions {
+            relax_zeros: true,
+            shorthand: false,
+            capture: false,
+            wrap: false,
+        };
+        // A 19-digit bound exceeds i64::MAX.
+        assert_eq!(to_regex_range("1", "9999999999999999999", &opts), None);
+    }
+
+    #[test]
+    fn i64_extremes_do_not_panic() {
+        let opts = RegexOptions {
+            relax_zeros: true,
+            shorthand: false,
+            capture: false,
+            wrap: false,
+        };
+        // 18 nines fits i64 but count_nines builds a wider all-nines string.
+        assert!(to_regex_range("1", "999999999999999999", &opts).is_some());
+        // i64::MIN has no positive counterpart for abs().
+        let min = i64::MIN.to_string();
+        assert!(to_regex_range(&min, "0", &opts).is_some());
+        // i64::MAX as the upper bound exercises the max+1 path.
+        let max = i64::MAX.to_string();
+        assert!(to_regex_range("1", &max, &opts).is_some());
+    }
 }
