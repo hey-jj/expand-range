@@ -1,0 +1,10 @@
+[package]
+name = "expand-range"
+version = "0.1.0"
+edition = "2021"
+description = "generate numeric/alphabetic ranges with steps and zero-padding for brace expansion"
+license = "MIT"
+repository = "https://github.com/hey-jj/expand-range"
+readme = "README.md"
+
+[dependencies]
