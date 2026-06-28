@@ -1,0 +1,76 @@
+//! Shared helpers for the conformance suite.
+//!
+//! These mirror the assertion helpers used by the reference test suite. `exact`
+//! compares item type and value, so a number is never equal to its string form.
+
+#![allow(dead_code)]
+
+use expand_range::{fill, fill_checked, FillError, FillResult, Item, Options, Step, Value};
+
+/// Build a numeric item, normalizing negative zero.
+pub fn n(x: f64) -> Item {
+    if x == 0.0 {
+        Item::Num(0.0)
+    } else {
+        Item::Num(x)
+    }
+}
+
+/// Build a string item.
+pub fn s(x: &str) -> Item {
+    Item::Str(x.to_string())
+}
+
+/// Assert a list result equals the expected items, type and value.
+#[track_caller]
+pub fn exact(actual: FillResult, expected: &[Item]) {
+    match actual {
+        FillResult::List(items) => {
+            assert_eq!(items.len(), expected.len(), "length mismatch: {items:?}");
+            for (i, (a, e)) in items.iter().zip(expected.iter()).enumerate() {
+                assert_eq!(a, e, "element {i} mismatch");
+            }
+        }
+        FillResult::Regex(r) => panic!("expected a list, got regex {r:?}"),
+    }
+}
+
+/// Assert a regex result equals the expected source string.
+#[track_caller]
+pub fn regex_eq(actual: FillResult, expected: &str) {
+    match actual {
+        FillResult::Regex(r) => assert_eq!(r, expected),
+        FillResult::List(items) => panic!("expected a regex, got list {items:?}"),
+    }
+}
+
+/// Run fill with non-strict default options.
+pub fn run(start: Value, end: Option<Value>, step: Step) -> FillResult {
+    fill(start, end, step, Options::new())
+}
+
+/// Run fill with the given options.
+pub fn run_opts(start: Value, end: Option<Value>, step: Step, opts: Options) -> FillResult {
+    fill(start, end, step, opts)
+}
+
+/// Run the checked entry, returning the strict-mode error if any.
+pub fn run_checked(
+    start: Value,
+    end: Option<Value>,
+    step: Step,
+    opts: Options,
+) -> Result<FillResult, FillError> {
+    fill_checked(start, end, step, opts)
+}
+
+/// Naive inclusive numeric enumerator, used by the match-verification oracle.
+pub fn expand(start: i64, stop: i64) -> Vec<i64> {
+    let mut out = vec![];
+    let mut i = start;
+    while i <= stop {
+        out.push(i);
+        i += 1;
+    }
+    out
+}

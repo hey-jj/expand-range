@@ -269,7 +269,8 @@ fn number_format(value: f64, to_number: bool) -> Item {
 fn fill_numbers(
     start: &Value,
     end: &Value,
-    step: f64,
+    step_text: &str,
+    step_value: f64,
     opts: &Options,
 ) -> Result<FillResult, FillError> {
     let a_raw = start.to_number().unwrap_or(f64::NAN);
@@ -286,8 +287,9 @@ fn fill_numbers(
     let descending = a > b;
     let start_string = start.as_text();
     let end_string = end.as_text();
-    let step_string = num_to_string(step);
-    let step = step.abs().max(1.0) as i64;
+    // The step keeps its original text so its leading zeros drive padding.
+    let step_string = step_text.to_string();
+    let step = step_value.abs().max(1.0) as i64;
 
     let padded = zeros(&start_string) || zeros(&end_string) || zeros(&step_string);
     let max_len = if padded {
@@ -303,11 +305,13 @@ fn fill_numbers(
     if opts.to_regex && step == 1 {
         let lo = to_max_len(&start_string, max_len);
         let hi = to_max_len(&end_string, max_len);
+        // The interval compiler receives `{ wrap: false, ...options }`, so the
+        // user's wrap setting wins over the default false.
         let ro = RegexOptions {
             relax_zeros: !opts.strict_zeros,
             shorthand: opts.shorthand,
             capture: opts.capture,
-            wrap: false,
+            wrap: opts.wrap,
         };
         return Ok(FillResult::Regex(to_regex_range(&lo, &hi, &ro)));
     }
@@ -478,10 +482,11 @@ pub fn fill_checked(
     match step {
         Step::Func(f) => {
             // The recursion uses a fresh options object holding only transform.
-            // Any prior options are discarded, matching the reference.
+            // Any prior options are discarded, matching the reference. The step
+            // resets to one.
             let mut opts = Options::new();
             opts.transform = Some(f);
-            dispatch(start, end, 1.0, opts)
+            finish_with_step(start, end, StepValue::Num(1.0), opts)
         }
         // The object becomes options with step reset to its own field or one.
         Step::Opts(opts) => dispatch_with_options(start, end, opts),
@@ -501,8 +506,8 @@ fn dispatch_with_options(
         opts.wrap = true;
     }
     // step = step || opts.step || 1, with no positional step.
-    let step = opts.step.filter(|n| *n != 0.0).unwrap_or(1.0);
-    finish_dispatch(start, end, step, opts)
+    let resolved = fallback_step(&opts);
+    finish_with_step(start, end, resolved, opts)
 }
 
 /// Resolve a positional numeric or string step, then dispatch.
@@ -553,18 +558,32 @@ fn resolve_numeric_step(
         return invalid_step(&label, opts.strict_ranges);
     }
 
-    let step_num = match &resolved {
-        StepValue::Num(n) => *n,
-        StepValue::Str(s) => value::js_coerce(s).unwrap_or(1.0),
-    };
-
-    finish_dispatch(start, end, step_num, opts)
+    finish_with_step(start, end, resolved, opts)
 }
 
-/// The step value after the `||` fallback chain.
+/// The step value after the `||` fallback chain. Keeps the text form so a
+/// padded step like `"03"` still drives output width.
 enum StepValue {
     Num(f64),
     Str(String),
+}
+
+impl StepValue {
+    /// The text used for the `String(step)` length and padding checks.
+    fn text(&self) -> String {
+        match self {
+            StepValue::Num(n) => num_to_string(*n),
+            StepValue::Str(s) => s.clone(),
+        }
+    }
+
+    /// The numeric magnitude source.
+    fn value(&self) -> f64 {
+        match self {
+            StepValue::Num(n) => *n,
+            StepValue::Str(s) => value::js_coerce(s).unwrap_or(1.0),
+        }
+    }
 }
 
 /// The fallback when a positional step is falsy: options.step, else one.
@@ -575,32 +594,19 @@ fn fallback_step(opts: &Options) -> StepValue {
     }
 }
 
-/// Final numbers-versus-letters split with a known numeric step.
-fn finish_dispatch(
+/// Final numbers-versus-letters split with a resolved step.
+fn finish_with_step(
     start: Value,
     end: Value,
-    step: f64,
+    step: StepValue,
     opts: Options,
 ) -> Result<FillResult, FillError> {
     if start.is_number() && end.is_number() {
-        fill_numbers(&start, &end, step, &opts)
+        fill_numbers(&start, &end, &step.text(), step.value(), &opts)
     } else {
-        let letter_step = (step.abs().max(1.0)) as i64;
+        let letter_step = step.value().abs().max(1.0) as i64;
         fill_letters(&start, &end, letter_step, &opts)
     }
-}
-
-/// Shared entry used after step and options are settled with a numeric step.
-fn dispatch(
-    start: Value,
-    end: Value,
-    step: f64,
-    mut opts: Options,
-) -> Result<FillResult, FillError> {
-    if opts.capture {
-        opts.wrap = true;
-    }
-    finish_dispatch(start, end, step, opts)
 }
 
 /// Convert a bound into the item the single-argument path returns unchanged.
