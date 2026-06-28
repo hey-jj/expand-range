@@ -12,7 +12,7 @@
 //! use expand_range::{range, Item};
 //!
 //! let r = range(1, 4);
-//! assert_eq!(r.expect_list(), &[Item::Num(1.0), Item::Num(2.0), Item::Num(3.0), Item::Num(4.0)]);
+//! assert_eq!(r.expect_list(), &[Item::Num(1), Item::Num(2), Item::Num(3), Item::Num(4)]);
 //! ```
 //!
 //! ```
@@ -80,7 +80,7 @@ impl FillResult {
 /// Strings are single quoted. Numbers print bare.
 fn inspect(value: &Value) -> String {
     match value {
-        Value::Num(n) => num_to_string(*n),
+        Value::Num(n) => n.to_string(),
         Value::Str(s) => format!("'{s}'"),
     }
 }
@@ -258,11 +258,11 @@ fn to_regex_array(members: &[String], wrap: bool, capture: bool) -> String {
 }
 
 /// Default formatter for a numeric element.
-fn number_format(value: f64, to_number: bool) -> Item {
+fn number_format(value: i64, to_number: bool) -> Item {
     if to_number {
         Item::num(value)
     } else {
-        Item::Str(num_to_string(value))
+        Item::Str(value.to_string())
     }
 }
 
@@ -345,10 +345,9 @@ fn fill_numbers(
                 parts.positives.push(current.abs());
             }
         } else {
-            let value = current as f64;
             let formatted = match &opts.transform {
-                Some(f) => f(Item::num(value), index),
-                None => number_format(value, to_number),
+                Some(f) => f(Item::num(current), index),
+                None => number_format(current, to_number),
             };
             range.push(pad(formatted, max_len, to_number));
         }
@@ -408,7 +407,7 @@ fn fill_letters(
             break;
         }
         let item = match &opts.transform {
-            Some(f) => f(Item::num(current as f64), index),
+            Some(f) => f(Item::num(current), index),
             None => Item::Str(
                 char::from_u32(current as u32)
                     .map(|c| c.to_string())
@@ -620,7 +619,7 @@ fn value_to_item(value: &Value) -> Item {
 ///
 /// ```
 /// use expand_range::{range, Item};
-/// assert_eq!(range(2, 5).expect_list(), &[Item::Num(2.0), Item::Num(3.0), Item::Num(4.0), Item::Num(5.0)]);
+/// assert_eq!(range(2, 5).expect_list(), &[Item::Num(2), Item::Num(3), Item::Num(4), Item::Num(5)]);
 /// ```
 pub fn range(start: i64, end: i64) -> FillResult {
     expand(

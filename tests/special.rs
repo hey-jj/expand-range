@@ -58,11 +58,11 @@ fn negative_zero() {
             Step::None,
             Options::new(),
         ),
-        &[n(0.0), n(1.0), n(2.0), n(3.0), n(4.0), n(5.0)],
+        &[n(0), n(1), n(2), n(3), n(4), n(5)],
     );
-    exact(fnnn(5, -0, 5), &[n(5.0), n(0.0)]);
-    exact(fnnn(5, -0, 2), &[n(5.0), n(3.0), n(1.0)]);
-    exact(fnnn(0, 5, 2), &[n(0.0), n(2.0), n(4.0)]);
+    exact(fnnn(5, -0, 5), &[n(5), n(0)]);
+    exact(fnnn(5, -0, 2), &[n(5), n(3), n(1)]);
+    exact(fnnn(0, 5, 2), &[n(0), n(2), n(4)]);
 }
 
 #[test]

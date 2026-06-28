@@ -7,13 +7,9 @@
 
 use expand_range::{expand, expand_checked, FillError, FillResult, Item, Options, Step, Value};
 
-/// Build a numeric item, normalizing negative zero.
-pub fn n(x: f64) -> Item {
-    if x == 0.0 {
-        Item::Num(0.0)
-    } else {
-        Item::Num(x)
-    }
+/// Build a numeric item.
+pub fn n(x: i64) -> Item {
+    Item::Num(x)
 }
 
 /// Build a string item.

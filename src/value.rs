@@ -7,24 +7,22 @@ use std::fmt;
 
 /// A range bound. Callers pass numbers or strings interchangeably.
 ///
-/// The string form is preserved so that leading zeros and text length survive
-/// into padding and regex generation.
-#[derive(Clone, Debug, PartialEq)]
+/// The numeric domain is integers, so a numeric bound is `i64`. The string form
+/// is preserved so that leading zeros and text length survive into padding and
+/// regex generation.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Value {
     /// A numeric bound such as `5` or `-10`.
-    Num(f64),
+    Num(i64),
     /// A string bound such as `"01"`, `"a"`, or `"-0"`.
     Str(String),
 }
 
 impl Value {
     /// The text used for length and padding decisions.
-    ///
-    /// Numbers render the way JavaScript `String(n)` would for the integers this
-    /// library handles. `-0` becomes `"0"`.
     pub(crate) fn as_text(&self) -> String {
         match self {
-            Value::Num(n) => num_to_string(*n),
+            Value::Num(n) => n.to_string(),
             Value::Str(s) => s.clone(),
         }
     }
@@ -41,18 +39,19 @@ impl Value {
 
     /// True when the value coerces to an integer.
     ///
-    /// Uses the same coercion as JavaScript `Number.isInteger(+value)`.
+    /// A numeric bound is always an integer. A string bound coerces the way
+    /// JavaScript `Number.isInteger(+value)` does.
     pub(crate) fn is_number(&self) -> bool {
         match self {
-            Value::Num(n) => n.is_finite() && n.fract() == 0.0,
+            Value::Num(_) => true,
             Value::Str(s) => js_coerce(s).is_some_and(|n| n.is_finite() && n.fract() == 0.0),
         }
     }
 
-    /// The numeric view via JavaScript `Number(value)` coercion.
+    /// The numeric view. String bounds coerce through JavaScript `Number()`.
     pub(crate) fn to_number(&self) -> Option<f64> {
         match self {
-            Value::Num(n) => Some(*n),
+            Value::Num(n) => Some(*n as f64),
             Value::Str(s) => js_coerce(s),
         }
     }
@@ -60,7 +59,7 @@ impl Value {
 
 impl From<i64> for Value {
     fn from(n: i64) -> Self {
-        Value::Num(n as f64)
+        Value::Num(n)
     }
 }
 
@@ -79,26 +78,28 @@ impl From<String> for Value {
 /// One produced element of a range.
 ///
 /// Numbers stay numbers unless the range is padded, stringified, or transformed
-/// to strings. The distinction matters: `1` and `"1"` are not equal.
-#[derive(Clone, Debug, PartialEq)]
+/// to strings. The distinction matters: `1` and `"1"` are not equal. The
+/// numeric element is `i64`, so `Item` derives `Eq` and `Hash` and works as a
+/// map key or set member.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Item {
     /// A numeric element.
-    Num(f64),
+    Num(i64),
     /// A string element.
     Str(String),
 }
 
 impl Item {
-    /// Build a numeric item, normalizing `-0` to `0` like JavaScript does.
-    pub(crate) fn num(n: f64) -> Self {
-        Item::Num(if n == 0.0 { 0.0 } else { n })
+    /// Build a numeric item.
+    pub(crate) fn num(n: i64) -> Self {
+        Item::Num(n)
     }
 }
 
 impl fmt::Display for Item {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Item::Num(n) => write!(f, "{}", num_to_string(*n)),
+            Item::Num(n) => write!(f, "{n}"),
             Item::Str(s) => write!(f, "{s}"),
         }
     }

@@ -20,7 +20,7 @@ use expand_range::{range, Item};
 let r = range(1, 4);
 assert_eq!(
     r.as_list(),
-    Some(&[Item::Num(1.0), Item::Num(2.0), Item::Num(3.0), Item::Num(4.0)][..])
+    Some(&[Item::Num(1), Item::Num(2), Item::Num(3), Item::Num(4)][..])
 );
 ```
 

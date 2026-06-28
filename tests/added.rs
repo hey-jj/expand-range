@@ -49,7 +49,7 @@ fn single_invalid_start_is_empty() {
 fn single_valid_value_returns_itself() {
     exact(
         expand(Value::from(5), None, Step::None, Options::new()),
-        &[n(5.0)],
+        &[n(5)],
     );
     exact(
         expand(Value::from("1"), None, Step::None, Options::new()),
@@ -61,7 +61,7 @@ fn single_valid_value_returns_itself() {
     );
     exact(
         expand(Value::from(0), None, Step::None, Options::new()),
-        &[n(0.0)],
+        &[n(0)],
     );
 }
 
@@ -132,7 +132,7 @@ fn wrap_without_to_regex_is_noop() {
     o.wrap = true;
     exact(
         expand(Value::from(1), Some(Value::from(3)), Step::None, o),
-        &[n(1.0), n(2.0), n(3.0)],
+        &[n(1), n(2), n(3)],
     );
 }
 

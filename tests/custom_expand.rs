@@ -14,7 +14,7 @@ fn current_value_is_first_param() {
         Step::Func(Box::new(|v, _i| v)),
         Options::new(),
     );
-    exact(r, &[n(1.0), n(2.0), n(3.0), n(4.0), n(5.0)]);
+    exact(r, &[n(1), n(2), n(3), n(4), n(5)]);
 }
 
 #[test]
