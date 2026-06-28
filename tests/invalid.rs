@@ -3,11 +3,11 @@
 mod common;
 
 use common::exact;
-use expand_range::{fill, Options, Step, Value};
+use expand_range::{expand, Options, Step, Value};
 
-/// fill(start, end) with no step.
+/// expand(start, end) with no step.
 fn f2(start: &str, end: &str) -> expand_range::FillResult {
-    fill(
+    expand(
         Value::from(start),
         Some(Value::from(end)),
         Step::None,
@@ -15,9 +15,9 @@ fn f2(start: &str, end: &str) -> expand_range::FillResult {
     )
 }
 
-/// fill(start, end, step).
+/// expand(start, end, step).
 fn f3(start: &str, end: &str, step: &str) -> expand_range::FillResult {
-    fill(
+    expand(
         Value::from(start),
         Some(Value::from(end)),
         Step::from(step),

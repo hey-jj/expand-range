@@ -16,11 +16,13 @@ pub(crate) struct RegexOptions {
     pub capture: bool,
     /// Auto-wrap multi-pattern output in a non-capturing group.
     ///
-    /// `fill` always passes this as false and does its own wrapping.
+    /// The step-one path passes this through from the user. The stepped path
+    /// passes false and does its own wrapping.
     pub wrap: bool,
 }
 
-/// State carried through the split, mirroring the source object of the same role.
+/// State carried through the split: whether the interval is padded and the
+/// width to pad to.
 struct State {
     is_padded: bool,
     max_len: usize,

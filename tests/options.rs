@@ -3,7 +3,7 @@
 mod common;
 
 use common::{exact, regex_eq, s};
-use expand_range::{fill, FillResult, Item, Options, Step, Value};
+use expand_range::{expand, FillResult, Item, Options, Step, Value};
 
 /// Options with stringify set.
 fn stringify_opts() -> Options {
@@ -22,7 +22,7 @@ fn regex_opts() -> Options {
 #[test]
 fn stringify_casts_to_strings() {
     exact(
-        fill(
+        expand(
             Value::from("1"),
             Some(Value::from("10")),
             Step::from("1"),
@@ -42,7 +42,7 @@ fn stringify_casts_to_strings() {
         ],
     );
     exact(
-        fill(
+        expand(
             Value::from(2),
             Some(Value::from(10)),
             Step::from("2"),
@@ -51,7 +51,7 @@ fn stringify_casts_to_strings() {
         &[s("2"), s("4"), s("6"), s("8"), s("10")],
     );
     exact(
-        fill(
+        expand(
             Value::from(2),
             Some(Value::from(10)),
             Step::from(1),
@@ -70,7 +70,7 @@ fn stringify_casts_to_strings() {
         ],
     );
     exact(
-        fill(
+        expand(
             Value::from(2),
             Some(Value::from(10)),
             Step::from(3),
@@ -88,7 +88,7 @@ fn transform_casts_to_strings() {
         o
     };
     exact(
-        fill(
+        expand(
             Value::from("1"),
             Some(Value::from("10")),
             Step::from("1"),
@@ -108,7 +108,7 @@ fn transform_casts_to_strings() {
         ],
     );
     exact(
-        fill(
+        expand(
             Value::from(2),
             Some(Value::from(10)),
             Step::from("2"),
@@ -117,7 +117,7 @@ fn transform_casts_to_strings() {
         &[s("2"), s("4"), s("6"), s("8"), s("10")],
     );
     exact(
-        fill(Value::from(2), Some(Value::from(10)), Step::from(1), opts()),
+        expand(Value::from(2), Some(Value::from(10)), Step::from(1), opts()),
         &[
             s("2"),
             s("3"),
@@ -131,14 +131,14 @@ fn transform_casts_to_strings() {
         ],
     );
     exact(
-        fill(Value::from(2), Some(Value::from(10)), Step::from(3), opts()),
+        expand(Value::from(2), Some(Value::from(10)), Step::from(3), opts()),
         &[s("2"), s("5"), s("8")],
     );
 }
 
-/// fill(num, num, {toRegex:true}).
+/// expand(num, num, {toRegex:true}).
 fn rnn(a: i64, b: i64) -> FillResult {
-    fill(
+    expand(
         Value::from(a),
         Some(Value::from(b)),
         Step::None,
@@ -157,7 +157,7 @@ fn regex_numbers_ascending() {
 fn regex_positive_and_negative() {
     regex_eq(rnn(-10, 10), "-[1-9]|-?10|[0-9]");
     regex_eq(
-        fill(
+        expand(
             Value::from(-10),
             Some(Value::from(10)),
             Step::from(2),
@@ -166,7 +166,7 @@ fn regex_positive_and_negative() {
         "0|2|4|6|8|10|-(?:2|4|6|8|10)",
     );
     regex_eq(
-        fill(
+        expand(
             Value::from(-10),
             Some(Value::from(0)),
             Step::from(2),
@@ -175,7 +175,7 @@ fn regex_positive_and_negative() {
         "0|-(?:2|4|6|8|10)",
     );
     regex_eq(
-        fill(
+        expand(
             Value::from(-10),
             Some(Value::from(-2)),
             Step::from(2),
@@ -199,18 +199,18 @@ fn regex_with_step() {
         o
     };
     regex_eq(
-        fill(Value::from(8), Some(Value::from(2)), Step::None, opts()),
+        expand(Value::from(8), Some(Value::from(2)), Step::None, opts()),
         "2|4|6|8",
     );
     regex_eq(
-        fill(Value::from(2), Some(Value::from(8)), Step::None, opts()),
+        expand(Value::from(2), Some(Value::from(8)), Step::None, opts()),
         "2|4|6|8",
     );
 }
 
-/// fill(str, str, {toRegex:true}).
+/// expand(str, str, {toRegex:true}).
 fn rss(a: &str, b: &str) -> FillResult {
-    fill(
+    expand(
         Value::from(a),
         Some(Value::from(b)),
         Step::None,
@@ -255,7 +255,7 @@ fn wrap_single_condition_not_wrapped() {
     o.to_regex = true;
     o.wrap = true;
     regex_eq(
-        fill(Value::from(2), Some(Value::from(8)), Step::None, o),
+        expand(Value::from(2), Some(Value::from(8)), Step::None, o),
         "[2-8]",
     );
 }
@@ -269,11 +269,11 @@ fn wrap_multi_in_parentheses() {
         o
     };
     regex_eq(
-        fill(Value::from(2), Some(Value::from(10)), Step::None, opts()),
+        expand(Value::from(2), Some(Value::from(10)), Step::None, opts()),
         "(?:[2-9]|10)",
     );
     regex_eq(
-        fill(Value::from(2), Some(Value::from(100)), Step::None, opts()),
+        expand(Value::from(2), Some(Value::from(100)), Step::None, opts()),
         "(?:[2-9]|[1-9][0-9]|100)",
     );
 }
@@ -287,7 +287,7 @@ fn wrap_positive_and_negative() {
         o
     };
     regex_eq(
-        fill(
+        expand(
             Value::from(-10),
             Some(Value::from(-2)),
             Step::from(2),
@@ -296,7 +296,7 @@ fn wrap_positive_and_negative() {
         "(?:-(?:2|4|6|8|10))",
     );
     regex_eq(
-        fill(
+        expand(
             Value::from(-10),
             Some(Value::from(0)),
             Step::from(2),
@@ -305,7 +305,7 @@ fn wrap_positive_and_negative() {
         "(?:0|-(?:2|4|6|8|10))",
     );
     regex_eq(
-        fill(
+        expand(
             Value::from(-10),
             Some(Value::from(10)),
             Step::from(2),
@@ -314,7 +314,7 @@ fn wrap_positive_and_negative() {
         "(?:0|2|4|6|8|10|-(?:2|4|6|8|10))",
     );
     regex_eq(
-        fill(Value::from(-10), Some(Value::from(10)), Step::None, opts()),
+        expand(Value::from(-10), Some(Value::from(10)), Step::None, opts()),
         "(?:-[1-9]|-?10|[0-9])",
     );
 }
@@ -328,7 +328,7 @@ fn capture_uses_capturing_group() {
         o
     };
     regex_eq(
-        fill(
+        expand(
             Value::from(-10),
             Some(Value::from(10)),
             Step::from(2),
@@ -337,7 +337,7 @@ fn capture_uses_capturing_group() {
         "(0|2|4|6|8|10|-(2|4|6|8|10))",
     );
     regex_eq(
-        fill(Value::from(-10), Some(Value::from(10)), Step::None, opts()),
+        expand(Value::from(-10), Some(Value::from(10)), Step::None, opts()),
         "(-[1-9]|-?10|[0-9])",
     );
 }

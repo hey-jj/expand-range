@@ -3,11 +3,11 @@
 mod common;
 
 use common::{exact, n, s};
-use expand_range::{fill, FillResult, Options, Step, Value};
+use expand_range::{expand, FillResult, Options, Step, Value};
 
-/// fill(start, end, step) where all three are strings.
+/// expand(start, end, step) where all three are strings.
 fn fs(start: &str, end: &str, step: &str) -> FillResult {
-    fill(
+    expand(
         Value::from(start),
         Some(Value::from(end)),
         Step::from(step),
@@ -15,9 +15,9 @@ fn fs(start: &str, end: &str, step: &str) -> FillResult {
     )
 }
 
-/// fill(num, num, num).
+/// expand(num, num, num).
 fn fnnn(start: i64, end: i64, step: i64) -> FillResult {
-    fill(
+    expand(
         Value::from(start),
         Some(Value::from(end)),
         Step::from(step),
@@ -51,7 +51,7 @@ fn increment_with_given_step() {
         &[s("0"), s("200"), s("400"), s("600"), s("800"), s("1000")],
     );
     exact(
-        fill(
+        expand(
             Value::from("1"),
             Some(Value::from("10")),
             Step::from(2),
@@ -87,7 +87,7 @@ fn increment_with_given_step() {
 
     // Number inputs keep number output unless a bound is a string.
     exact(
-        fill(
+        expand(
             Value::from(2),
             Some(Value::from(10)),
             Step::from("2"),
@@ -117,7 +117,7 @@ fn increment_with_given_step() {
 
     // End is a string, so output is strings.
     exact(
-        fill(
+        expand(
             Value::from(2),
             Some(Value::from("10")),
             Step::from(2),
@@ -126,7 +126,7 @@ fn increment_with_given_step() {
         &[s("2"), s("4"), s("6"), s("8"), s("10")],
     );
     exact(
-        fill(
+        expand(
             Value::from(2),
             Some(Value::from("10")),
             Step::from(1),
@@ -145,7 +145,7 @@ fn increment_with_given_step() {
         ],
     );
     exact(
-        fill(
+        expand(
             Value::from(2),
             Some(Value::from("10")),
             Step::from("2"),
@@ -154,7 +154,7 @@ fn increment_with_given_step() {
         &[s("2"), s("4"), s("6"), s("8"), s("10")],
     );
     exact(
-        fill(
+        expand(
             Value::from("2"),
             Some(Value::from(10)),
             Step::from("3"),
@@ -304,7 +304,7 @@ fn negative_zero_passed() {
 #[test]
 fn steps_letters() {
     exact(
-        fill(
+        expand(
             Value::from("z"),
             Some(Value::from("a")),
             Step::from(-2),
@@ -327,7 +327,7 @@ fn steps_letters() {
         ],
     );
     exact(
-        fill(
+        expand(
             Value::from("a"),
             Some(Value::from("e")),
             Step::from(2),
@@ -336,7 +336,7 @@ fn steps_letters() {
         &[s("a"), s("c"), s("e")],
     );
     exact(
-        fill(
+        expand(
             Value::from("E"),
             Some(Value::from("A")),
             Step::from(2),
@@ -355,7 +355,7 @@ fn options_step() {
         o
     };
     exact(
-        fill(
+        expand(
             Value::from("a"),
             Some(Value::from("e")),
             Step::Opts(opts()),
@@ -364,7 +364,7 @@ fn options_step() {
         &[s("a"), s("c"), s("e")],
     );
     exact(
-        fill(
+        expand(
             Value::from("E"),
             Some(Value::from("A")),
             Step::Opts(opts()),

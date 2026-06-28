@@ -2,7 +2,7 @@
 
 mod common;
 
-use expand_range::{fill_checked, FillError, Options, Step, Value};
+use expand_range::{expand_checked, FillError, Options, Step, Value};
 
 /// Strict options.
 fn strict() -> Options {
@@ -13,7 +13,7 @@ fn strict() -> Options {
 
 /// Run the checked entry in strict mode and return the error.
 fn err(start: Value, end: Value, step: Step) -> FillError {
-    fill_checked(start, Some(end), step, strict()).expect_err("expected an error")
+    expand_checked(start, Some(end), step, strict()).expect_err("expected an error")
 }
 
 #[test]
@@ -23,7 +23,7 @@ fn range_error_on_invalid_bounds() {
         FillError::Range("Invalid range arguments: [ '0a', '0z' ]".to_string())
     );
     // Empty start with a step argument and strict mode.
-    let e = fill_checked(
+    let e = expand_checked(
         Value::from(""),
         Some(Value::from("*")),
         Step::from(2),

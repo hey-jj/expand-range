@@ -5,7 +5,7 @@
 
 #![allow(dead_code)]
 
-use expand_range::{fill, fill_checked, FillError, FillResult, Item, Options, Step, Value};
+use expand_range::{expand, expand_checked, FillError, FillResult, Item, Options, Step, Value};
 
 /// Build a numeric item, normalizing negative zero.
 pub fn n(x: f64) -> Item {
@@ -44,14 +44,14 @@ pub fn regex_eq(actual: FillResult, expected: &str) {
     }
 }
 
-/// Run fill with non-strict default options.
+/// Run expand with non-strict default options.
 pub fn run(start: Value, end: Option<Value>, step: Step) -> FillResult {
-    fill(start, end, step, Options::new())
+    expand(start, end, step, Options::new())
 }
 
-/// Run fill with the given options.
+/// Run expand with the given options.
 pub fn run_opts(start: Value, end: Option<Value>, step: Step, opts: Options) -> FillResult {
-    fill(start, end, step, opts)
+    expand(start, end, step, opts)
 }
 
 /// Run the checked entry, returning the strict-mode error if any.
@@ -61,14 +61,14 @@ pub fn run_checked(
     step: Step,
     opts: Options,
 ) -> Result<FillResult, FillError> {
-    fill_checked(start, end, step, opts)
+    expand_checked(start, end, step, opts)
 }
 
 /// Build a regex from a numeric range and test a candidate against it.
 ///
-/// Mirrors `new RegExp('^(' + fill(...) + ')$').test(input)`.
+/// Mirrors `new RegExp('^(' + expand(...) + ')$').test(input)`.
 pub fn is_match(start: Value, end: Value, opts: Options, input: &str) -> bool {
-    let source = match fill(start, Some(end), Step::None, opts) {
+    let source = match expand(start, Some(end), Step::None, opts) {
         FillResult::Regex(r) => r,
         FillResult::List(_) => panic!("expected a regex result"),
     };
@@ -77,7 +77,7 @@ pub fn is_match(start: Value, end: Value, opts: Options, input: &str) -> bool {
 }
 
 /// Naive inclusive numeric enumerator, used by the match-verification oracle.
-pub fn expand(start: i64, stop: i64) -> Vec<i64> {
+pub fn enumerate(start: i64, stop: i64) -> Vec<i64> {
     let mut out = vec![];
     let mut i = start;
     while i <= stop {

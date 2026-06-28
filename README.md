@@ -15,45 +15,47 @@ expand-range = "0.1"
 ## Usage
 
 ```rust
-use expand_range::{fill_range, Item};
+use expand_range::{range, Item};
 
-let r = fill_range(1, 4);
+let r = range(1, 4);
 assert_eq!(
-    r.list(),
-    &[Item::Num(1.0), Item::Num(2.0), Item::Num(3.0), Item::Num(4.0)]
+    r.as_list(),
+    Some(&[Item::Num(1.0), Item::Num(2.0), Item::Num(3.0), Item::Num(4.0)][..])
 );
 ```
 
 Letters walk character codes:
 
 ```rust
-use expand_range::{fill, Value, Step, Options};
+use expand_range::{expand, Value, Step, Options};
 
-let r = fill(Value::from("a"), Some(Value::from("c")), Step::None, Options::new());
-assert_eq!(r.to_string_list(), vec!["a", "b", "c"]);
+let r = expand(Value::from("a"), Some(Value::from("c")), Step::None, Options::new());
+assert_eq!(
+    r.to_string_list(),
+    Some(vec!["a".to_string(), "b".to_string(), "c".to_string()])
+);
 ```
 
 A regex source string instead of a list:
 
 ```rust
-use expand_range::{fill, Value, Step, Options};
+use expand_range::{expand, Value, Step, Options};
 
-let mut opts = Options::new();
-opts.to_regex = true;
-let r = fill(Value::from(2), Some(Value::from(100)), Step::None, opts);
-assert_eq!(r.regex(), "[2-9]|[1-9][0-9]|100");
+let opts = Options::new().to_regex(true);
+let r = expand(Value::from(2), Some(Value::from(100)), Step::None, opts);
+assert_eq!(r.as_regex(), Some("[2-9]|[1-9][0-9]|100"));
 ```
 
 ## Behavior
 
-- Direction comes from the bounds. `fill(5, 1)` descends.
+- Direction comes from the bounds. `expand(5, 1)` descends.
 - The step magnitude is used. A step of `-2` and `2` behave the same.
 - A leading zero on any bound or the step pads every output to a common width.
 - String bounds keep their text form, so output stays string typed.
 - Bounds may be numbers or single characters. Letter ranges walk character
   codes, so `'a'..'C'` passes through ASCII punctuation.
 - Invalid input returns an empty list. Set `strict_ranges` to get a typed error
-  through `fill_checked` instead.
+  through `expand_checked` instead.
 
 ## License
 

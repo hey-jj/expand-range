@@ -3,11 +3,11 @@
 mod common;
 
 use common::{exact, regex_eq, s};
-use expand_range::{fill, FillResult, Options, Step, Value};
+use expand_range::{expand, FillResult, Options, Step, Value};
 
-/// fill(start, end) with no step.
+/// expand(start, end) with no step.
 fn f2(start: &str, end: &str) -> FillResult {
-    fill(
+    expand(
         Value::from(start),
         Some(Value::from(end)),
         Step::None,
@@ -15,9 +15,9 @@ fn f2(start: &str, end: &str) -> FillResult {
     )
 }
 
-/// fill(start, end, step).
+/// expand(start, end, step).
 fn f3(start: &str, end: &str, step: &str) -> FillResult {
-    fill(
+    expand(
         Value::from(start),
         Some(Value::from(end)),
         Step::from(step),
@@ -25,9 +25,9 @@ fn f3(start: &str, end: &str, step: &str) -> FillResult {
     )
 }
 
-/// fill(start, end, num_step).
+/// expand(start, end, num_step).
 fn f3n(start: &str, end: &str, step: i64) -> FillResult {
-    fill(
+    expand(
         Value::from(start),
         Some(Value::from(end)),
         Step::from(step),
@@ -35,19 +35,19 @@ fn f3n(start: &str, end: &str, step: i64) -> FillResult {
     )
 }
 
-/// fill(start, end, {toRegex:true}).
+/// expand(start, end, {toRegex:true}).
 fn fre(start: &str, end: &str) -> FillResult {
     let mut o = Options::new();
     o.to_regex = true;
-    fill(Value::from(start), Some(Value::from(end)), Step::None, o)
+    expand(Value::from(start), Some(Value::from(end)), Step::None, o)
 }
 
-/// fill(start, end, {toRegex:true, strictZeros:true}).
+/// expand(start, end, {toRegex:true, strictZeros:true}).
 fn fre_strict(start: &str, end: &str) -> FillResult {
     let mut o = Options::new();
     o.to_regex = true;
     o.strict_zeros = true;
-    fill(Value::from(start), Some(Value::from(end)), Step::None, o)
+    expand(Value::from(start), Some(Value::from(end)), Step::None, o)
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn pad_incremented_numbers() {
     );
     // Spot-check a long padded run.
     let r = f2("05", "100");
-    let items = r.list();
+    let items = r.expect_list();
     assert_eq!(items.len(), 96);
     assert_eq!(items.first(), Some(&s("005")));
     assert_eq!(items.last(), Some(&s("100")));
@@ -159,7 +159,7 @@ fn pad_stepped_numbers() {
         &[s("002"), s("004"), s("006"), s("008"), s("010")],
     );
     exact(
-        fill(
+        expand(
             Value::from("-04"),
             Some(Value::from(4)),
             Step::from(2),

@@ -31,7 +31,7 @@ impl Value {
 
     /// True when the value is a non-empty string or any number.
     ///
-    /// Mirrors the `isValidValue` guard. Empty strings are rejected.
+    /// Empty strings are rejected.
     pub(crate) fn is_valid(&self) -> bool {
         match self {
             Value::Num(_) => true,
@@ -61,12 +61,6 @@ impl Value {
 impl From<i64> for Value {
     fn from(n: i64) -> Self {
         Value::Num(n as f64)
-    }
-}
-
-impl From<f64> for Value {
-    fn from(n: f64) -> Self {
-        Value::Num(n)
     }
 }
 
@@ -110,7 +104,7 @@ impl fmt::Display for Item {
     }
 }
 
-/// The result of a fill call.
+/// The result of an expand call.
 #[derive(Clone, Debug, PartialEq)]
 pub enum FillResult {
     /// A list of range elements.
@@ -120,22 +114,59 @@ pub enum FillResult {
 }
 
 impl FillResult {
-    /// Borrow the list, or panic when the result is a regex.
+    /// Borrow the list, or `None` when the result is a regex.
     ///
-    /// Test and caller convenience for the common array case.
-    pub fn list(&self) -> &[Item] {
+    /// The variant depends on whether `to_regex` was set, so prefer this over
+    /// the panicking [`expect_list`](Self::expect_list).
+    pub fn as_list(&self) -> Option<&[Item]> {
         match self {
-            FillResult::List(items) => items,
-            FillResult::Regex(_) => panic!("expected a list result, got a regex"),
+            FillResult::List(items) => Some(items),
+            FillResult::Regex(_) => None,
         }
     }
 
-    /// Borrow the regex source, or panic when the result is a list.
-    pub fn regex(&self) -> &str {
+    /// Borrow the regex source, or `None` when the result is a list.
+    pub fn as_regex(&self) -> Option<&str> {
         match self {
-            FillResult::Regex(s) => s,
-            FillResult::List(_) => panic!("expected a regex result, got a list"),
+            FillResult::Regex(s) => Some(s),
+            FillResult::List(_) => None,
         }
+    }
+
+    /// Take the list, or `None` when the result is a regex.
+    ///
+    /// Consumes the result so the items move out without a clone.
+    pub fn into_list(self) -> Option<Vec<Item>> {
+        match self {
+            FillResult::List(items) => Some(items),
+            FillResult::Regex(_) => None,
+        }
+    }
+
+    /// Take the regex source, or `None` when the result is a list.
+    pub fn into_regex(self) -> Option<String> {
+        match self {
+            FillResult::Regex(s) => Some(s),
+            FillResult::List(_) => None,
+        }
+    }
+
+    /// Borrow the list, or panic when the result is a regex.
+    ///
+    /// Convenience for tests and call sites that statically know the variant.
+    /// The `expect` name marks the panic. Use [`as_list`](Self::as_list) to
+    /// handle both variants.
+    pub fn expect_list(&self) -> &[Item] {
+        self.as_list().expect("expected a list result, got a regex")
+    }
+
+    /// Borrow the regex source, or panic when the result is a list.
+    ///
+    /// The `expect` name marks the panic. Use [`as_regex`](Self::as_regex) to
+    /// handle both variants.
+    pub fn expect_regex(&self) -> &str {
+        self.as_regex()
+            .expect("expected a regex result, got a list")
     }
 }
 

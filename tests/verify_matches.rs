@@ -2,15 +2,15 @@
 
 mod common;
 
-use common::expand;
-use expand_range::{fill, FillResult, Options, Step, Value};
+use common::enumerate;
+use expand_range::{expand, FillResult, Options, Step, Value};
 use regex::Regex;
 
 /// Build the anchored regex for `[min, max]` once.
 fn matcher(min: i64, max: i64) -> Regex {
     let mut opts = Options::new();
     opts.to_regex = true;
-    let source = match fill(Value::from(min), Some(Value::from(max)), Step::None, opts) {
+    let source = match expand(Value::from(min), Some(Value::from(max)), Step::None, opts) {
         FillResult::Regex(r) => r,
         FillResult::List(_) => panic!("expected regex"),
     };
@@ -20,7 +20,7 @@ fn matcher(min: i64, max: i64) -> Regex {
 /// For every integer in `[from, to]`, the regex matches iff it lies in `[min, max]`.
 fn verify_range(min: i64, max: i64, from: i64, to: i64) {
     let re = matcher(min, max);
-    for num in expand(from, to) {
+    for num in enumerate(from, to) {
         let want = min <= num && num <= max;
         let got = re.is_match(&num.to_string());
         assert_eq!(got, want, "n={num} min={min} max={max}");

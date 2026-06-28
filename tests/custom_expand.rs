@@ -3,12 +3,12 @@
 mod common;
 
 use common::{exact, n, s};
-use expand_range::{fill, Item, Options, Step, Value};
+use expand_range::{expand, Item, Options, Step, Value};
 
 #[test]
 fn current_value_is_first_param() {
     // Identity transform returns the numeric value unchanged.
-    let r = fill(
+    let r = expand(
         Value::from(1),
         Some(Value::from(5)),
         Step::Func(Box::new(|v, _i| v)),
@@ -20,7 +20,7 @@ fn current_value_is_first_param() {
 #[test]
 fn character_code_for_non_integers() {
     // Letter mode passes the character code as the value.
-    let r = fill(
+    let r = expand(
         Value::from("a"),
         Some(Value::from("e")),
         Step::Func(Box::new(|v, _i| {
@@ -37,7 +37,7 @@ fn character_code_for_non_integers() {
 
 #[test]
 fn transform_can_pad() {
-    let r = fill(
+    let r = expand(
         Value::from("01"),
         Some(Value::from("05")),
         Step::Func(Box::new(|v, _i| {
@@ -53,7 +53,7 @@ fn transform_can_pad() {
 
 #[test]
 fn index_is_second_param() {
-    let r = fill(
+    let r = expand(
         Value::from("a"),
         Some(Value::from("e")),
         Step::Func(Box::new(|v, i| {

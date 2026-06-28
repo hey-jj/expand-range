@@ -9,28 +9,29 @@
 //! # Examples
 //!
 //! ```
-//! use expand_range::{fill_range, Item};
+//! use expand_range::{range, Item};
 //!
-//! let r = fill_range(1, 4);
-//! assert_eq!(r.list(), &[Item::Num(1.0), Item::Num(2.0), Item::Num(3.0), Item::Num(4.0)]);
+//! let r = range(1, 4);
+//! assert_eq!(r.expect_list(), &[Item::Num(1.0), Item::Num(2.0), Item::Num(3.0), Item::Num(4.0)]);
 //! ```
 //!
 //! ```
-//! use expand_range::{fill, Value, Step, Options};
+//! use expand_range::{expand, Value, Step, Options};
 //!
 //! // String bounds keep their text form, so output stays string-typed.
-//! let r = fill(Value::from("a"), Some(Value::from("c")), Step::None, Options::new());
-//! assert_eq!(r.to_string_list(), vec!["a", "b", "c"]);
+//! let r = expand(Value::from("a"), Some(Value::from("c")), Step::None, Options::new());
+//! assert_eq!(r.to_string_list(), Some(vec!["a".to_string(), "b".to_string(), "c".to_string()]));
 //! ```
 //!
 //! # Behavior
 //!
-//! - Direction is inferred from the bounds. `fill(5, 1)` descends.
+//! - Direction is inferred from the bounds. `expand(5, 1)` descends.
 //! - The step magnitude is used. A step of `-2` and `2` behave the same.
 //! - Leading zeros on any bound or the step pad every output to a common width.
 //! - Bounds may be numbers or single characters. Letter ranges walk character
 //!   codes, so `'a'..'C'` passes through ASCII punctuation.
-//! - Invalid input returns an empty list, or an error when `strict_ranges` is set.
+//! - Invalid input returns an empty list. Set `strict_ranges` and call
+//!   `expand_checked` to get an error instead.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -50,8 +51,8 @@ use value::num_to_string;
 pub enum FillError {
     /// The bounds do not form a valid range.
     ///
-    /// The message matches the text the JavaScript library throws, including the
-    /// `[ 'a', 'b' ]` formatting.
+    /// The message names both bounds, with strings single quoted, as in
+    /// `Invalid range arguments: [ 'a', 'b' ]`.
     Range(String),
     /// The step is not a number.
     Step(String),
@@ -68,13 +69,13 @@ impl std::fmt::Display for FillError {
 impl std::error::Error for FillError {}
 
 impl FillResult {
-    /// Collect the list as plain strings. Panics on a regex result.
-    pub fn to_string_list(&self) -> Vec<String> {
-        self.list().iter().map(|i| i.to_string()).collect()
+    /// Collect the list as plain strings, or `None` on a regex result.
+    pub fn to_string_list(&self) -> Option<Vec<String>> {
+        Some(self.as_list()?.iter().map(|i| i.to_string()).collect())
     }
 }
 
-/// Render a bound for error messages the way Node's `util.inspect` would.
+/// Render a bound for error messages.
 ///
 /// Strings are single quoted. Numbers print bare.
 fn inspect(value: &Value) -> String {
@@ -305,8 +306,8 @@ fn fill_numbers(
     if opts.to_regex && step == 1 {
         let lo = to_max_len(&start_string, max_len);
         let hi = to_max_len(&end_string, max_len);
-        // The interval compiler receives `{ wrap: false, ...options }`, so the
-        // user's wrap setting wins over the default false.
+        // The step-one path forwards the user's wrap and capture into the
+        // interval compiler, which does its own wrapping.
         let ro = RegexOptions {
             relax_zeros: !opts.strict_zeros,
             shorthand: opts.shorthand,
@@ -424,9 +425,8 @@ fn fill_letters(
     }
 
     if opts.to_regex {
-        // The source passes `{ wrap: false, options }` here, nesting options
-        // under a key instead of spreading it. So wrap and capture never apply
-        // on this path. The result is always the plain join.
+        // Letter regex output is always the plain join. wrap and capture do not
+        // apply on this path.
         let members: Vec<String> = range.iter().map(|i| i.to_string()).collect();
         return Ok(FillResult::Regex(to_regex_array(&members, false, false)));
     }
@@ -441,20 +441,21 @@ fn fill_letters(
 /// transform function, or an options object. `options` carries the rest.
 ///
 /// Returns a list of items, or a regex source string when `to_regex` is set.
-/// Invalid input yields an empty list, or an error when `strict_ranges` is set.
+/// Invalid input yields an empty list.
 ///
-/// This never panics on bad input. It returns `Result` so strict mode can report
-/// the same errors the reference behavior throws.
-pub fn fill(start: Value, end: Option<Value>, step: Step, options: Options) -> FillResult {
-    fill_checked(start, end, step, options).unwrap_or(FillResult::List(vec![]))
+/// This never returns an error and never panics. `strict_ranges` has no effect
+/// here. To observe strict-mode errors, set `strict_ranges` and call
+/// [`expand_checked`].
+pub fn expand(start: Value, end: Option<Value>, step: Step, options: Options) -> FillResult {
+    expand_checked(start, end, step, options).unwrap_or(FillResult::List(vec![]))
 }
 
-/// Like [`fill`], but returns the strict-mode error instead of swallowing it.
+/// Like [`expand`], but returns the strict-mode error instead of swallowing it.
 ///
 /// When `strict_ranges` is set, invalid bounds or a bad step produce
 /// [`FillError`]. Otherwise this returns `Ok` with an empty list for invalid
-/// input, matching [`fill`].
-pub fn fill_checked(
+/// input, matching [`expand`].
+pub fn expand_checked(
     start: Value,
     end: Option<Value>,
     step: Step,
@@ -477,9 +478,9 @@ pub fn fill_checked(
     // Step-position dispatch.
     match step {
         Step::Func(f) => {
-            // The recursion uses a fresh options object holding only transform.
-            // Any prior options are discarded, matching the reference. The step
-            // resets to one.
+            // A transform in step position starts a fresh options value that
+            // holds only the transform. Any prior options are dropped and the
+            // step resets to one.
             let mut opts = Options::new();
             opts.transform = Some(f);
             finish_with_step(start, end, StepValue::Num(1.0), opts)
@@ -615,14 +616,14 @@ fn value_to_item(value: &Value) -> Item {
 
 /// Expand an integer range with default options.
 ///
-/// Convenience over [`fill`] for the common numeric case.
+/// Convenience over [`expand`] for the common numeric case.
 ///
 /// ```
-/// use expand_range::{fill_range, Item};
-/// assert_eq!(fill_range(2, 5).list(), &[Item::Num(2.0), Item::Num(3.0), Item::Num(4.0), Item::Num(5.0)]);
+/// use expand_range::{range, Item};
+/// assert_eq!(range(2, 5).expect_list(), &[Item::Num(2.0), Item::Num(3.0), Item::Num(4.0), Item::Num(5.0)]);
 /// ```
-pub fn fill_range(start: i64, end: i64) -> FillResult {
-    fill(
+pub fn range(start: i64, end: i64) -> FillResult {
+    expand(
         Value::from(start),
         Some(Value::from(end)),
         Step::None,

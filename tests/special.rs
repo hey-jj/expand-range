@@ -3,11 +3,11 @@
 mod common;
 
 use common::{exact, n, s};
-use expand_range::{fill, FillResult, Options, Step, Value};
+use expand_range::{expand, FillResult, Options, Step, Value};
 
-/// fill(start, end, step) with string bounds and string step.
+/// expand(start, end, step) with string bounds and string step.
 fn fs(start: &str, end: &str, step: &str) -> FillResult {
-    fill(
+    expand(
         Value::from(start),
         Some(Value::from(end)),
         Step::from(step),
@@ -15,9 +15,9 @@ fn fs(start: &str, end: &str, step: &str) -> FillResult {
     )
 }
 
-/// fill(start, end, num_step) with string bounds.
+/// expand(start, end, num_step) with string bounds.
 fn fsn(start: &str, end: &str, step: i64) -> FillResult {
-    fill(
+    expand(
         Value::from(start),
         Some(Value::from(end)),
         Step::from(step),
@@ -25,9 +25,9 @@ fn fsn(start: &str, end: &str, step: i64) -> FillResult {
     )
 }
 
-/// fill(num, num, num).
+/// expand(num, num, num).
 fn fnnn(start: i64, end: i64, step: i64) -> FillResult {
-    fill(
+    expand(
         Value::from(start),
         Some(Value::from(end)),
         Step::from(step),
@@ -52,7 +52,7 @@ fn negative_zero() {
         &[s("0"), s("1"), s("2"), s("3"), s("4"), s("5")],
     );
     exact(
-        fill(
+        expand(
             Value::from(-0_i64),
             Some(Value::from(5)),
             Step::None,
@@ -68,7 +68,7 @@ fn negative_zero() {
 #[test]
 fn adjust_padding_for_negative_numbers() {
     exact(
-        fill(
+        expand(
             Value::from("-01"),
             Some(Value::from("5")),
             Step::None,

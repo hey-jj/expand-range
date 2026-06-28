@@ -3,11 +3,11 @@
 mod common;
 
 use common::{exact, n, s};
-use expand_range::{fill, Options, Step, Value};
+use expand_range::{expand, Options, Step, Value};
 
-/// fill(start, end) with no step and default options.
+/// expand(start, end) with no step and default options.
 fn f2(start: &str, end: &str) -> expand_range::FillResult {
-    fill(
+    expand(
         Value::from(start),
         Some(Value::from(end)),
         Step::None,
@@ -15,9 +15,9 @@ fn f2(start: &str, end: &str) -> expand_range::FillResult {
     )
 }
 
-/// fill(start) single argument.
+/// expand(start) single argument.
 fn f1(start: Value) -> expand_range::FillResult {
-    fill(start, None, Step::None, Options::new())
+    expand(start, None, Step::None, Options::new())
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn increment_alphanumeric_ranges() {
 #[test]
 fn step_alphanumeric_ranges() {
     exact(
-        fill(
+        expand(
             Value::from("9"),
             Some(Value::from("B")),
             Step::from(3),
@@ -275,9 +275,9 @@ fn increment_numeric_number_ranges() {
     exact(num(5, 8), &[n(5.0), n(6.0), n(7.0), n(8.0)]);
 }
 
-/// fill(num, num).
+/// expand(num, num).
 fn num(a: i64, b: i64) -> expand_range::FillResult {
-    fill(
+    expand(
         Value::from(a),
         Some(Value::from(b)),
         Step::None,
@@ -289,7 +289,7 @@ fn num(a: i64, b: i64) -> expand_range::FillResult {
 fn combination_of_number_and_string() {
     // start is a string, so output is strings.
     exact(
-        fill(
+        expand(
             Value::from("1"),
             Some(Value::from(9_i64)),
             Step::None,
@@ -308,7 +308,7 @@ fn combination_of_number_and_string() {
         ],
     );
     exact(
-        fill(
+        expand(
             Value::from("2"),
             Some(Value::from(5_i64)),
             Step::None,
