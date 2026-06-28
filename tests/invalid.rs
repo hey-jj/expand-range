@@ -42,3 +42,13 @@ fn invalid_returns_empty() {
     exact(f2("1.2", "2"), &[]);
     exact(f2("1.20", "2"), &[]);
 }
+
+#[test]
+fn radix_prefixed_bounds_are_not_numbers() {
+    // Hex, octal, and binary literals are out of scope for numeric coercion.
+    // They fail the integer check and produce an empty range.
+    exact(f2("1", "0x10"), &[]);
+    exact(f2("1", "0o10"), &[]);
+    exact(f2("1", "0b10"), &[]);
+    exact(f3("1", "10", "0x2"), &[]);
+}

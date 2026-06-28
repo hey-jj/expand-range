@@ -10,6 +10,12 @@ use std::fmt;
 /// The numeric domain is integers, so a numeric bound is `i64`. The string form
 /// is preserved so that leading zeros and text length survive into padding and
 /// regex generation.
+///
+/// A string bound is coerced to a number for the numeric path. The accepted
+/// forms are a decimal integer, an optional leading sign, leading zeros, and a
+/// decimal or exponent part that still resolves to a whole number. Hex, octal,
+/// and binary literals such as `"0x10"` are not accepted and produce an empty
+/// range.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Value {
     /// A numeric bound such as `5` or `-10`.
