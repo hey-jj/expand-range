@@ -81,6 +81,26 @@ fn wide_padded_vector_uses_relaxed_quantifiers() {
 }
 
 #[test]
+fn letter_regex_escapes_metacharacters() {
+    // A bare "." would match any character, so an equal punctuation bound escapes.
+    regex_eq(rxs(".", ".", |_| {}), "\\.");
+
+    // Stepped punctuation members escape, so the join stays a literal
+    // alternation instead of a character class that matches "|".
+    let mut o = Options::new();
+    o.to_regex = true;
+    let source = match expand(Value::from("["), Some(Value::from("]")), Step::from(2), o) {
+        FillResult::Regex(r) => r,
+        FillResult::List(_) => panic!("expected regex"),
+    };
+    assert_eq!(source, "\\[|\\]");
+    let re = regex::Regex::new(&format!("^({source})$")).expect("valid regex");
+    assert!(re.is_match("["));
+    assert!(re.is_match("]"));
+    assert!(!re.is_match("|"));
+}
+
+#[test]
 fn empty_string_step_falls_through_to_one() {
     exact(
         expand(

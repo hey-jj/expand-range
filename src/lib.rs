@@ -234,16 +234,25 @@ fn to_sequence(mut parts: Parts, opts: &Options, max_len: usize) -> String {
     }
 }
 
+/// Escape one character so it matches itself as a regex literal.
+fn escape_char(c: char) -> String {
+    if "\\^$.|?*+()[]{}".contains(c) {
+        format!("\\{c}")
+    } else {
+        c.to_string()
+    }
+}
+
 /// Regex source for a letter range with step one.
 ///
 /// Returns a single character when the bounds are equal, else a class `[a-z]`.
 fn letter_range(a: i64, b: i64) -> String {
     let start = char::from_u32(a as u32).unwrap_or('\u{0}');
     if a == b {
-        return start.to_string();
+        return escape_char(start);
     }
     let stop = char::from_u32(b as u32).unwrap_or('\u{0}');
-    format!("[{start}-{stop}]")
+    format!("[{}-{}]", escape_char(start), escape_char(stop))
 }
 
 /// Regex source for a list of literal members, joined with `|`.
@@ -426,7 +435,10 @@ fn fill_letters(
     if opts.to_regex {
         // Letter regex output is always the plain join. wrap and capture do not
         // apply on this path.
-        let members: Vec<String> = range.iter().map(|i| i.to_string()).collect();
+        let members: Vec<String> = range
+            .iter()
+            .map(|i| i.to_string().chars().map(escape_char).collect())
+            .collect();
         return Ok(FillResult::Regex(to_regex_array(&members, false, false)));
     }
 
