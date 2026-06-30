@@ -276,6 +276,24 @@ fn num(a: i64, b: i64) -> expand_range::FillResult {
 }
 
 #[test]
+fn endpoint_does_not_overflow() {
+    // Advancing past the final bound must not overflow i64. Ascending hits the
+    // addition path at i64::MAX.
+    exact(num(i64::MAX, i64::MAX), &[n(i64::MAX)]);
+    // Descending hits the subtraction path at i64::MIN. The bounds are chosen so
+    // they survive the f64 round trip exactly.
+    exact(
+        expand(
+            Value::from(i64::MIN + 2048),
+            Some(Value::from(i64::MIN)),
+            Step::from(2048),
+            Options::new(),
+        ),
+        &[n(i64::MIN + 2048), n(i64::MIN)],
+    );
+}
+
+#[test]
 fn combination_of_number_and_string() {
     // start is a string, so output is strings.
     exact(

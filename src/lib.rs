@@ -360,10 +360,14 @@ fn fill_numbers(
             };
             range.push(pad(formatted, max_len, to_number));
         }
-        current = if descending {
-            current - step
+        let next = if descending {
+            current.checked_sub(step)
         } else {
-            current + step
+            current.checked_add(step)
+        };
+        current = match next {
+            Some(v) => v,
+            None => break,
         };
         index += 1;
     }
