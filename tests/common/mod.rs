@@ -1,7 +1,7 @@
 //! Shared helpers for the conformance suite.
 //!
-//! These mirror the assertion helpers used by the reference test suite. `exact`
-//! compares item type and value, so a number is never equal to its string form.
+//! `exact` compares item type and value, so a number is never equal to its
+//! string form.
 
 #![allow(dead_code)]
 
