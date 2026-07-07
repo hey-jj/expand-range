@@ -91,12 +91,17 @@ fn to_character_class(a: u8, b: u8) -> String {
 }
 
 /// Padding prefix for a value given the target width.
-fn pad_zeros(value: i64, st: &State, relax: bool) -> String {
+fn pad_zeros(value: i64, st: &State, relax: bool, negative: bool) -> String {
     if !st.is_padded {
         return value.to_string();
     }
-    let len = value.abs().to_string().len();
-    let diff = st.max_len.abs_diff(len);
+    let len = value.to_string().len();
+    let target = if negative {
+        st.max_len.saturating_sub(1)
+    } else {
+        st.max_len
+    };
+    let diff = target.abs_diff(len);
     match diff {
         0 => String::new(),
         1 => {
@@ -189,7 +194,14 @@ fn range_to_pattern(start: &str, stop: &str, shorthand: bool) -> Token {
 }
 
 /// Build tokens spanning `[min, max]`, merging repeats and applying padding.
-fn split_to_patterns(min: i64, max: i64, st: &State, relax: bool, shorthand: bool) -> Vec<Token> {
+fn split_to_patterns(
+    min: i64,
+    max: i64,
+    st: &State,
+    relax: bool,
+    shorthand: bool,
+    negative: bool,
+) -> Vec<Token> {
     let ranges = split_to_ranges(min, max);
     let mut tokens: Vec<Token> = vec![];
     let mut start = min;
@@ -209,7 +221,7 @@ fn split_to_patterns(min: i64, max: i64, st: &State, relax: bool, shorthand: boo
             }
         }
         let zeros = if st.is_padded {
-            pad_zeros(max, st, relax)
+            pad_zeros(max, st, relax, negative)
         } else {
             String::new()
         };
@@ -307,12 +319,12 @@ pub(crate) fn to_regex_range(min: &str, max: &str, opts: &RegexOptions) -> Optio
             1
         };
         let a_abs = a.unsigned_abs().min(i64::MAX as u64) as i64;
-        negatives = split_to_patterns(new_min, a_abs, &st, opts.relax_zeros, opts.shorthand);
+        negatives = split_to_patterns(new_min, a_abs, &st, opts.relax_zeros, opts.shorthand, true);
         a = 0;
     }
 
     if b >= 0 {
-        positives = split_to_patterns(a, b, &st, opts.relax_zeros, opts.shorthand);
+        positives = split_to_patterns(a, b, &st, opts.relax_zeros, opts.shorthand, false);
     }
 
     let mut result = collate_patterns(&negatives, &positives);

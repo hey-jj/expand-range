@@ -218,6 +218,18 @@ fn rss(a: &str, b: &str) -> FillResult {
     )
 }
 
+fn strict_regex_source(a: &str, b: &str) -> String {
+    match expand(
+        Value::from(a),
+        Some(Value::from(b)),
+        Step::None,
+        Options::new().to_regex(true).strict_zeros(true),
+    ) {
+        FillResult::Regex(source) => source,
+        FillResult::List(items) => panic!("expected regex, got list {items:?}"),
+    }
+}
+
 #[test]
 fn regex_zero_padding() {
     regex_eq(rss("002", "008"), "0{0,2}[2-8]");
@@ -228,13 +240,19 @@ fn regex_zero_padding() {
 
 #[test]
 fn regex_negative_zero_padding() {
-    regex_eq(rss("-002", "-100"), "-0{0,3}[2-9]|-0{0,2}[1-9][0-9]|-0?100");
-    regex_eq(rss("-02", "-08"), "-0{0,2}[2-8]");
-    regex_eq(rss("-02", "-100"), "-0{0,3}[2-9]|-0{0,2}[1-9][0-9]|-0?100");
-    regex_eq(
-        rss("-02", "100"),
-        "-0{0,2}[12]|0{0,2}[0-9]|0?[1-9][0-9]|100",
-    );
+    regex_eq(rss("-002", "-100"), "-0{0,2}[2-9]|-0?[1-9][0-9]|-100");
+    regex_eq(rss("-02", "-08"), "-0?[2-8]");
+    regex_eq(rss("-02", "-100"), "-0{0,2}[2-9]|-0?[1-9][0-9]|-100");
+    regex_eq(rss("-02", "100"), "-0?[12]|0{0,2}[0-9]|0?[1-9][0-9]|100");
+}
+
+#[test]
+fn strict_negative_zero_padding_matches_bound_width() {
+    let source = strict_regex_source("-05", "05");
+    assert_eq!(source, "-0[1-5]|00[0-5]");
+    let re = regex::Regex::new(&format!("^({source})$")).expect("valid regex");
+    assert!(re.is_match("-05"));
+    assert!(!re.is_match("-005"));
 }
 
 #[test]
