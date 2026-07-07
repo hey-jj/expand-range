@@ -54,11 +54,18 @@ impl Value {
         }
     }
 
-    /// The numeric view. String bounds coerce through JavaScript `Number()`.
-    pub(crate) fn to_number(&self) -> Option<f64> {
+    /// The integer view. String bounds coerce through JavaScript `Number()`.
+    pub(crate) fn to_i64(&self) -> Option<i64> {
         match self {
-            Value::Num(n) => Some(*n as f64),
-            Value::Str(s) => js_coerce(s),
+            Value::Num(n) => Some(*n),
+            Value::Str(s) => {
+                let n = js_coerce(s)?;
+                if n.is_finite() && n.fract() == 0.0 {
+                    Some(n as i64)
+                } else {
+                    None
+                }
+            }
         }
     }
 }

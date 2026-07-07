@@ -185,9 +185,9 @@ fn stringify_flag(start: &Value, end: &Value, opts: &Options) -> bool {
     matches!(start, Value::Str(_)) || matches!(end, Value::Str(_)) || opts.stringify
 }
 
-/// Partitioned absolute values for the stepped regex path.
+/// Partitioned magnitudes for the stepped regex path.
 struct Parts {
-    negatives: Vec<i64>,
+    negatives: Vec<u64>,
     positives: Vec<i64>,
 }
 
@@ -243,6 +243,14 @@ fn escape_char(c: char) -> String {
     }
 }
 
+fn escape_class_endpoint(c: char) -> String {
+    if c == '-' {
+        "\\x2d".to_string()
+    } else {
+        escape_char(c)
+    }
+}
+
 /// Regex source for a letter range with step one.
 ///
 /// Returns a single character when the bounds are equal, else a class `[a-z]`.
@@ -252,7 +260,11 @@ fn letter_range(a: i64, b: i64) -> String {
         return escape_char(start);
     }
     let stop = char::from_u32(b as u32).unwrap_or('\u{0}');
-    format!("[{}-{}]", escape_char(start), escape_char(stop))
+    format!(
+        "[{}-{}]",
+        escape_class_endpoint(start),
+        escape_class_endpoint(stop)
+    )
 }
 
 /// Regex source for a list of literal members, joined with `|`.
@@ -283,16 +295,12 @@ fn fill_numbers(
     step_value: f64,
     opts: &Options,
 ) -> Result<FillResult, FillError> {
-    let a_raw = start.to_number().unwrap_or(f64::NAN);
-    let b_raw = end.to_number().unwrap_or(f64::NAN);
-
-    if a_raw.fract() != 0.0 || b_raw.fract() != 0.0 || !a_raw.is_finite() || !b_raw.is_finite() {
+    let Some(a) = start.to_i64() else {
         return invalid_range(start, end, opts.strict_ranges);
-    }
-
-    // Negative zero is normalized to zero by integer math below.
-    let a = a_raw as i64;
-    let b = b_raw as i64;
+    };
+    let Some(b) = end.to_i64() else {
+        return invalid_range(start, end, opts.strict_ranges);
+    };
 
     let descending = a > b;
     let start_string = start.as_text();
@@ -313,8 +321,8 @@ fn fill_numbers(
     let to_number = !padded && !stringify_flag(start, end, opts);
 
     if opts.to_regex && step == 1 {
-        let lo = to_max_len(&start_string, max_len);
-        let hi = to_max_len(&end_string, max_len);
+        let lo = to_max_len(&a.to_string(), max_len);
+        let hi = to_max_len(&b.to_string(), max_len);
         // The step-one path forwards the user's wrap and capture into the
         // interval compiler, which does its own wrapping.
         let ro = RegexOptions {
@@ -349,9 +357,9 @@ fn fill_numbers(
         }
         if opts.to_regex && step > 1 {
             if current < 0 {
-                parts.negatives.push(current.abs());
+                parts.negatives.push(current.unsigned_abs());
             } else {
-                parts.positives.push(current.abs());
+                parts.positives.push(current);
             }
         } else {
             let formatted = match &opts.transform {
@@ -428,10 +436,14 @@ fn fill_letters(
             ),
         };
         range.push(item);
-        current = if descending {
-            current - step
+        let next = if descending {
+            current.checked_sub(step)
         } else {
-            current + step
+            current.checked_add(step)
+        };
+        current = match next {
+            Some(v) => v,
+            None => break,
         };
         index += 1;
     }
@@ -644,4 +656,104 @@ pub fn range(start: i64, end: i64) -> FillResult {
         Step::None,
         Options::new(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn regex_source(result: FillResult) -> String {
+        match result {
+            FillResult::Regex(source) => source,
+            FillResult::List(items) => panic!("expected regex, got list {items:?}"),
+        }
+    }
+
+    #[test]
+    fn numeric_value_bounds_keep_i64_precision() {
+        assert_eq!(
+            expand(
+                Value::from(i64::MAX - 1),
+                Some(Value::from(i64::MAX)),
+                Step::None,
+                Options::new()
+            ),
+            FillResult::List(vec![Item::Num(i64::MAX - 1), Item::Num(i64::MAX)])
+        );
+    }
+
+    #[test]
+    fn regex_bounds_use_coerced_i64_text() {
+        let signed = regex_source(expand(
+            Value::from("+2"),
+            Some(Value::from("+3")),
+            Step::None,
+            Options::new().to_regex(true),
+        ));
+        assert_eq!(signed, "2|3");
+        regex::Regex::new(&format!("^({signed})$")).expect("valid regex");
+
+        let decimal = regex_source(expand(
+            Value::from("1."),
+            Some(Value::from("1.")),
+            Step::None,
+            Options::new().to_regex(true),
+        ));
+        assert_eq!(decimal, "1");
+        let re = regex::Regex::new(&format!("^({decimal})$")).expect("valid regex");
+        assert!(re.is_match("1"));
+        assert!(!re.is_match("1x"));
+    }
+
+    #[test]
+    fn letter_steps_stop_on_overflow() {
+        assert_eq!(
+            expand(
+                Value::from("a"),
+                Some(Value::from("b")),
+                Step::from(i64::MAX),
+                Options::new()
+            ),
+            FillResult::List(vec![Item::Str("a".to_string())])
+        );
+        assert_eq!(
+            expand(
+                Value::from("a"),
+                Some(Value::from("z")),
+                Step::Num(1e19),
+                Options::new()
+            ),
+            FillResult::List(vec![Item::Str("a".to_string())])
+        );
+    }
+
+    #[test]
+    fn stepped_regex_accepts_i64_min() {
+        assert_eq!(
+            expand(
+                Value::from(i64::MIN),
+                Some(Value::from(i64::MIN + 2)),
+                Step::from(2),
+                Options::new().to_regex(true)
+            ),
+            FillResult::Regex(format!(
+                "-(?:{}|{})",
+                i64::MIN.unsigned_abs() - 2,
+                i64::MIN.unsigned_abs()
+            ))
+        );
+    }
+
+    #[test]
+    fn hyphen_endpoint_regex_matches_full_interval() {
+        let source = regex_source(expand(
+            Value::from(" "),
+            Some(Value::from("-")),
+            Step::None,
+            Options::new().to_regex(true),
+        ));
+        assert_eq!(source, "[ -\\x2d]");
+        let re = regex::Regex::new(&format!("^({source})$")).expect("valid regex");
+        assert!(re.is_match("!"));
+    }
 }
